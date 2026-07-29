@@ -56,6 +56,9 @@ langchain-test/
 └── .gitignore       # Git 忽略规则
 ```
 
+## 页面运行效果图
+![AI助手前端聊天界面](Final rendering.png)
+
 ## License
 
 MIT
