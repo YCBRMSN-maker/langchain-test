@@ -57,7 +57,7 @@ langchain-test/
 ```
 
 ## 页面运行效果图
-![AI助手前端聊天界面](Final rendering.png)
+![AI助手前端聊天界面](Final_rendering.png)
 
 ## License
 
