@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "Microsoft YaHei", sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: #fff;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .msg {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .user {
+            align-self: flex-end;
+            background: #4a90d9;
+            color: #fff;
+        }
+        .ai {
+            align-self: flex-start;
+            background: #fff;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+        .ai.loading {
+            color: #999;
+            font-style: italic;
+        }
+        #input-area {
+            background: #fff;
+            padding: 16px 24px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        #input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        #input:focus { border-color: #4a90d9; }
+        #send {
+            padding: 12px 28px;
+            background: #4a90d9;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        #send:hover { background: #3a7bc8; }
+        #send:disabled { background: #ccc; cursor: not-allowed; }
+        #upload-btn {
+            padding: 12px;
+            background: #f0f0f0;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #upload-btn:hover { background: #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div id="header">AI 助手</div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input id="file-input" type="file" accept=".txt,.pdf,.docx,.md" multiple style="display: none;">
+        <button id="upload-btn" onclick="document.getElementById('file-input').click()">📎</button>
+        <div id="file-preview" style="display: none; font-size: 12px; color: #666;"></div>
+        <input id="input" type="text" placeholder="输入消息..." autocomplete="off">
+        <button id="send" onclick="send()">发送</button>
+    </div>
+    <script>
+        const threadId = 'thread_' + Date.now();
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+        const messages = document.getElementById('messages');
+        const fileInput = document.getElementById('file-input');
+        const filePreview = document.getElementById('file-preview');
+        let selectedFiles = [];
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length > 0) {
+                filePreview.style.display = 'block';
+                filePreview.textContent = selectedFiles.map(f => f.name).join(', ');
+            } else {
+                filePreview.style.display = 'none';
+            }
+        });
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') send();
+        });
+
+        async function send() {
+            const text = input.value.trim();
+            if (!text && selectedFiles.length === 0) return;
+            input.value = '';
+            sendBtn.disabled = true;
+
+            let displayText = text;
+            if (selectedFiles.length > 0) {
+                displayText = text ? text + ' [附件: ' + selectedFiles.map(f => f.name).join(', ') + ']' : '[附件: ' + selectedFiles.map(f => f.name).join(', ') + ']';
+            }
+            addMsg(displayText, 'user');
+            const loading = addMsg('思考中...', 'ai loading');
+
+            try {
+                let res;
+                if (selectedFiles.length > 0) {
+                    const formData = new FormData();
+                    formData.append('message', text);
+                    formData.append('thread_id', threadId);
+                    selectedFiles.forEach(file => {
+                        formData.append('files', file);
+                    });
+                    res = await fetch('/chat/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                } else {
+                    res = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text, thread_id: threadId }),
+                    });
+                }
+                const data = await res.json();
+                loading.textContent = data.reply;
+                loading.classList.remove('loading');
+            } catch (err) {
+                loading.textContent = '出错了：' + err.message;
+                loading.classList.remove('loading');
+            }
+
+            selectedFiles = [];
+            fileInput.value = '';
+            filePreview.style.display = 'none';
+            sendBtn.disabled = false;
+            input.focus();
+        }
+
+        function addMsg(text, cls) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + cls;
+            div.textContent = text;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+        }
+
+        input.focus();
+    </script>
+</body>
+</html>
